@@ -1,0 +1,335 @@
+Changelog 3.1.6 (2019-01-25)
+----------------------------
+* The Kotlin extension function called "has" is now null safe
+* The Kotlin extension function called "has" now accepts non-null types
+* Upgraded Kotlin extension to use Kotlin 1.3.11 (instead of 1.2.50)
+
+Changelog 3.1.5 (2018-12-06)
+----------------------------
+* Added a new Kotlin extension function called "has" that allows writing succinct expressions when testing for properties in e.g. data classes. For example:
+
+  val data = await untilCallTo { fakeObjectRepository.data } has {
+       state == "Hello"
+  }
+
+  where "data" is defined as:
+
+  data class Data(var state: String)
+
+  I.e. inside the scope of "has" the "Data" instance is used as "this" (see [here](https://kotlinlang.org/docs/reference/lambdas.html#function-literals-with-receiver) for more info).
+  This is the same as doing:
+
+  await untilCallTo { fakeObjectRepository.data } matches { data ->
+      data?.state == "Hello"
+  }
+* Improved error message for "untilNotNull" Kotlin extension function
+* Added "untilNull" extension function to the Kotlin DSL: await untilNull { myDataRepository.findById("id") }
+
+Changelog 3.1.4 (2018-12-05)
+----------------------------
+* Added "untilNotNull" extension function to the Kotlin DSL: val data = await untilNotNull { myDataRepository.findById("id") }
+
+Changelog 3.1.3 (2018-11-16)
+----------------------------
+* Last exception is included in hierarchy even if ignoreExceptions is set (issue 121) (thanks to Bryn Cooke for pull request)
+* Removed the use of java.beans.Introspector for de-capitalization of String's since it doesn't work on Android (issue 125)
+
+Changelog 3.1.2 (2018-07-24)
+----------------------------
+* Added "alias" method to awaitility which allows one to set the alias using a more english-like DSL:
+    await().with().alias("my alias"). ..
+* Added several new Kotlin extension methods. For example you can now do:
+
+    await withPollInterval ONE_HUNDRED_MILLISECONDS ignoreException IllegalArgumentException::class untilAsserted  {
+        assertThat(fakeRepository.value).isEqualTo(1)
+    }
+
+  or:
+
+     await withAlias "Kotlin Test" ignoreExceptionsInstanceOf
+            IllegalArgumentException::class withPollDelay ONE_HUNDRED_MILLISECONDS withPollInterval
+            fibonacci().with().offset(1).and().timeUnit(MILLISECONDS) atLeast TWO_HUNDRED_MILLISECONDS atMost
+            ONE_MINUTE untilCallTo { fakeRepository.value } matches { it == 1 }
+
+  All extension functions can be imported from the "org.awaitility.kotlin" package (e.g. 'import org.awaitility.kotlin.*')
+
+Changelog 3.1.1 (2018-06-29)
+----------------------------
+* Hamcrest condition evaluation should be safer if called from multiple threads
+* Fixed bug where error message showed in Hamcrest condition could be the same as the expected value when conditional evaluation time exceeded at most time (issue 109).
+* Added org.awaitility.core.ConditionFactory.until(java.util.concurrent.Callable<T>, org.awaitility.core.Predicate<? super T>) that allows you to use a predicate to evaluate a condition like this:
+    await().until(myRepository::count, cnt -> cnt == 2);
+* Added Kotlin module. In maven add:
+
+    <dependency>
+            <groupId>org.awaitility</groupId>
+            <artifactId>awaitility-kotlin</artifactId>
+            <version>3.1.1</version>
+    </dependency>
+
+  This module adds an extension function called "untilCallTo" (in org.awaitility.kotlin.AwaitilityKt) that allows you to write conditions as:
+
+     await().untilCallTo { fakeRepository.value } matches { it == 1 }
+
+Changelog 3.1.0 (2018-03-02)
+----------------------------
+* Bumped all identified out of data properties, some of which applied to dependencies, and bumped all plugin versions, tests are all passing (thanks to Andy Glick for pull request)
+* Fixed issue with ConditionAwaiter calculating a negative condition duration (and thus raised an IllegalArgumentException) in cases where System.currentTimeMillis returned a non-monotonic value (issue 95)
+* Throw TimeoutException from executing long-running Callables as ConditionTimeoutException (thanks to James Withers for pull request) (issue 97)
+* Updated Objenesis dependency from 2.5.1 to 2.6.0 (issue 104)
+* Use wall-clock agnostic System.nanoTime instead of System.currentTimeMillis internally (thanks to Ben Barnard for pull request)
+* Improved error messages for assertion conditions when using aliases. Previously aliases could be included twice in the ConditionTimeoutException which obscured the error message somewhat (issue 108).
+* Fixed so that Awaitility doesn't stop working when using custom threading with multiple conditions. This also greatly improves use cases where one supplies a custom ExecutorService to Awaitility.
+  It'll no longer be shutdown after each call to Awaitility. It's up to you as a user to shutdown the ExecutorService that you provide to Awaitility (issue 101).
+
+Changelog 3.0.0 (2017-04-28)
+----------------------------
+* Error messages are improved for Hamcrest lambda expressions whose mismatch description originally is generated as empty by Hamcrest (issue 87)
+
+Changelog 3.0.0-rc3 (2017-04-07)
+--------------------------------
+* Possible non-backward compatible change: You can now ignore throwables and not only exceptions. This shouldn't affect your old code if you previously used Java 8 lamda expressions or method references but if you previously did:
+    await().atMost(1000, MILLISECONDS).with().ignoreExceptionsMatching(new Predicate<Exception>() {
+            public boolean matches(Exception e) {
+                return e instanceof RuntimeException;
+            }
+        }).until(..);
+  then you now have to change the Predicate to use Throwable instead:
+      await().atMost(1000, MILLISECONDS).with().ignoreExceptionsMatching(new Predicate<Throwable>() {
+              public boolean matches(Throwable e) {
+                  return e instanceof RuntimeException;
+              }
+          }).until(..);
+  (issue 85)
+* Uncaught exceptions from other threads now takes "ignore exceptions" into account. For example if any thread throws IllegalArgumentException and this exception has been marked as ignored then it won't be treated as an error.
+  Previously this was only applicable to exceptions that were thrown by the polling (condition evaluation) thread.
+* Potential backward-incompatible change: The untilAsserted method no longer takes a "Runnable" as argument but rather a "ThrowingRunnable" which allows the runnable to throw checked exceptions.
+  This is backward incompatible only if you've supplied an explicit instance of Runnable to the function. If using Java 8 lambda expressions then nothing should change.
+* Removed org.awaitility.Awaitility#matches method since it's no longer needed
+
+Changelog 3.0.0-rc2 (2017-03-31)
+--------------------------------
+* Updated ByteBuddy to version 1.6.11
+* Downgraded Scala version to 2.11.8 again since 2.12.x requires Java 8
+* Removed the need for the Awaitility poll scheduling thread which means that Awaitility only uses one thread by default
+* Non-backward compatible change: Removed most public constructors in org.awaitility.core.ConditionFactory since they shouldn't be used
+* Moved inner class org.awaitility.pollinterval.IterativePollInterval.Function to org.awaitility.core.Function and changed it to use generics for input and output
+* Added ability to specify the executor service or thread to be used to perform condition evaluations (polling) by using ConditionFactory#pollThread or ConditionFactory#pollExecutorService, for example:
+    given().pollThread(Thread::new).await().atMost(1000, MILLISECONDS).until(() -> fakeRepository.getValue() == 1);
+  Awaitility will now use the Thread created by in the "Thread::new" supplier when performing evaluation of the "() -> fakeRepository.getValue() == 1" lambda expression.
+  It's also possible to configure Awaitility poll in the same thread as the test:
+    given().pollInSameThread().await().atMost(1000, MILLISECONDS).until(() -> fakeRepository.getValue() == 1);
+  This is an advanced feature and you should be careful when combining "pollInSameThread" with conditions that wait forever (or a long time)
+  since Awaitility cannot interrupt the thread when it's using the same thread as the test.
+
+Changelog 3.0.0-rc1 (2017-03-17)
+--------------------------------
+* Fixed issue in org.awaitility.Duration which made it depend on Java 7 features (issue 50)
+* Shaded CGLib dependency to avoid conflicts with other libraries and upgraded version to 3.2.4 (thanks to Alejandro Iannucci for pull request) (issue 55)
+* Removed the deprecated value org.awaitility.Duration#SAME_AS_POLL_INTERVAL (thanks to Paweł Chorążyk for pull request).
+* Cleaned up some internal code and reduced some internal boiler-plate (thanks to Mykhailo Kovalskyi for pull request)
+* Migrated from CgLib to ByteBuddy for class proxies (thanks to Marcin Zajączkowski for pull request)
+* Fixed regression of ClassCastException for non-bool Groovy closures (thanks to Piotr Kubowicz for pull request) (issue 72)
+* Named the thread in ConditionAwaiter#pollSchedulingThread to "awaitility-poll-scheduling" (thanks to Piotr Kubowicz for pull request) (issue 70)
+* Updated AbstractHamcrestCondition to use the matcher's mismatch message (thanks to chanceVermilion for pull request) (issue 21)
+* Bumped property versions, plugin versions, dependency versions (thanks to Andy Glick for pull request) (issue 21)
+* Waiting for the condition awaiter thread to shutdown after "shutdownNow" in order to avoid having a thread left running after a test (issue 69)
+* Catching throwable instead of exception in poll-scheduling thread
+* Added root cause to ConditionTimeoutException when applicable so that one can more easily distinguish find where an error occurred (issue 67)
+* Non-backward compatible change: Moved proxy creation to a new project called "awaitility-proxy". This means that if you need to use proxies depend on this project:
+    <dependency>
+    	<groupId>org.awaitility</groupId>
+    	<artifactId>awaitility-proxy</artifactId>
+    	<version>3.0.0-rc1</version>
+    </dependency>
+  You create a proxy when you do:
+    await().untilCall( to(someObject).someMethod(), is(4) );
+  The "to" method has been moved to "org.awaitility.proxy.AwaitilityClassProxy".
+* Upgraded Scala support module to use Scala 2.12.1 (previous version was 2.11.8)
+* Upgraded Groovy support module to use Groovy 2.4.9 (previous version was 2.4.8)
+* Removed the deprecated classes org.awaitility.groovy.AwaitilitySupport and org.awaitility.groovy.AwaitilityTrait from the Groovy module
+* Fixed an issue where a condition didn't fail until the condition timeout even though an exception was thrown in the condition (issue 78)
+* Non-backward compatible change: Renamed the "until(Runnable)" method in org.awaitility.core.ConditionFactory to "untilAsserted(Runnable)".
+  The reasons for this are:
+    1. Runnable and Callable are ambiguous in other languages such as Kotlin and Groovy which causes problems when integration with these languages.
+    2. It's not clear (enough) when to use the Callable variant vs the Runnable variant when using plain Java
+  This means that if you previously did:
+    await().until(() -> assertThat(something()).isEqualTo("Something"));
+  you now need to do:
+    await().untilAsserted(() -> assertThat(something()).isEqualTo("Something"));
+
+Changelog 2.0.0 (2016-06-17)
+----------------------------
+* Fixed issue with static fibonacci method that took an offset as argument which was not used
+* Condition awaiter thread does now have a meaningful name based on the await alias (if defined) (thanks to Alex Simkin for pull request)
+* Added atLeast support, for example:
+    await().atLeast(1, SECONDS).and().atMost(2, SECONDS).until(value(), equalTo(1));
+  Big thanks to Oleksii for helping out (issue 38)
+* Awaitility now requires Java 6 (Java 5 was previously required)
+* Updates to the groovy module. org.awaitility.groovy.AwailitySupport, org.awaitility.groovy.AwaitilityGroovyBridge
+  and org.awaitility.groovy.AwaitilityTrait have been deprecated.  The reason is that both AwaitilitySupport and AwaitilityTrait have
+  one big flaws. When not used for one test class, these test cases might or might not fail, depending on execution order. For this
+  reason an AwaitilityExtensionModule has been created which automatically add a new method until(Closure) to the ConditionFactory.
+  So with groovy 2 and above, there is effectively no need any more to use AwaitilitySupport, AwaitilityTrait or AwaitilityGroovyBridge.
+  All you need to do is add awaitility-groovy to your classpath and you are good. Big thanks to Tobias Schulte for pull request.
+* Improved Scala support. Previously only boolean expressions could be passed to "until" in Scala but now you can pass any supported type. For example you can now use assertj conditions:
+    await until { assertThat(c1.count() + c2.count(),  is(6)) }
+  (thanks to Grzegorz Ligas for pull request)
+* Changed package name from "com.jayway.awaitility" to "org.awaitility"
+* Changed groupId from "com.jayway.awaitility" to "org.awaitility"
+
+Changelog 1.7.0 (2015-11-27)
+----------------------------
+* Deadlock detection is no longer applied on platform that doesn't support it such as Android (issue 30)
+* ConditionEvaluationLogger now logs the poll interval of the evaluated condition
+* Deprecations: Duration.SAME_AS_POLL_INTERVAL is deprecated since it's no longer used. It'll be removed in a future release.
+* Introducing non-fixed poll intervals. PollInterval is now a first-class concept (represented by a com.jayway.awaitility.pollinterval.PollInterval)
+  and it's non possible use non-fixed poll intervals. By default Awaitility uses the FixedPollInterval (default 100 ms just as in previous version)
+  but you can now change another type of poll interval. Awaitility ships with three different PollInterval implementations:
+  Fixed (default), Fibonacci and Iterative. To use the Fibonacci poll interval you can do like this:
+    with().pollInterval(fibonacci()).await().until(..);
+  this will generate a poll interval of 1, 1, 2, 3, 5, 8, 13, .. . Note that Duration.ZERO is used as start value for all non-fixed poll intervals
+  (for fixed poll intervals the poll delay is equal to the duration of the FixedPollInterval for backward compatible reasons). (issue 36)
+* Improvement to Duration (com.jayway.awaitility.Duration). You can invoke make use of the new methods plus, minus, multiply, divide. For example:
+    new Duration(5, SECONDS).plus(17, MILLISECONDS); // Will return a new Duration of 5017 milliseconds.
+* Added Duration.ONE_MILLISECOND
+* Added ability to wait for Runnable (void) conditions that declares check exceptions. For example if we have the following method:
+    public void something() throws Exception { ... }
+  We can't just do:
+    await().until(() -> something());
+  since something might throw a checked exception (and the lambda expression thus can't be treated as a Runnable). To work-around this
+  make use of the "matches" method declared in com.jayway.awaitility.Awaitility:
+     await().until(matches(() -> something()));
+  Big thanks to Tomasz Kowalczewski and Marcin Zajączkowski for helping out. (issue 32)
+
+Changelog 1.6.5 (2015-09-27)
+----------------------------
+* Added ability to ignore exceptions while evaluating a condition. This is useful if you're waiting for something that throws exceptions
+  as an intermediate value before the final state is reached. As an example take Spring's SocketUtils class that allows you to find an
+  available TCP port in a given range. It will throw an exception if no port is available in the given range. So let's say we know that the ports
+  in the given range are currently not available but we want to wait for them to be available. In that case we need to ignore the exceptions thrown
+  by SocketUtils.
+  For example:
+    given().ignoreExceptions().await().until(() -> SocketUtils.findAvailableTcpPort(x,y));
+ This instruct Awaitility to ignore all caught exceptions during condition evaluation. Exceptions will be treated as evaluating to false.
+ The test will not fail upon an exception matching the supplied exception type, unless it times out. You can also ignore specific exceptions:
+   given().ignoreException(IllegalStateException.class).await().until(() -> SocketUtils.findAvailableTcpPort(x,y));
+ or use Hamcrest matcher:
+   given().ignoreExceptionsMatching(instanceOf(RuntimeException.class)).await().until(() -> SocketUtils.findAvailableTcpPort(x,y));
+ or a predicate:
+   given().ignoreExceptionsMatching(e -> e.getMessage().startsWith("Could not find an available")).await().until(something());
+* Updated the Groovy version to 2.4.4 from 2.3.7 in the Groovy extension.
+* Updated the Scala version to 2.11.3 from 2.11.7 in the Scala extension.
+
+Changelog 1.6.4 (2015-09-14)
+---------------------------
+* Updated to JUnit 4.12
+* Allow parallel test execution with MethodCallRecorder (thanks to Tom Bujok for pull request)
+
+Changelog 1.6.3 (2014-11-28)
+----------------------------
+* Awaitility now gracefully handles cases when findDeadLockedThreads() is not supported on certain JVM:s (thanks to Jeremie Jost for pull request).
+
+Changelog 1.6.2 (2014-10-15)
+----------------------------
+* awaitility-java8 project was renamed to awaitility-java8-test to better describe its purpose.
+* Support for automatic deadlock detection. The awaitility stracktrace will now include deadlock information if a deadlock was found (thanks to Tobias Bieniek for pull request).
+* Condition evaluation listeners now supports non Hamcrest based conditions (thanks to Tomasz Kalkosiński for the help).
+* Condition evaluation listeners now expose condition alias
+* Improved error messages for lambda- and Runnable conditions
+* Upgraded Scala dependency to version 2.11.3.
+* Upgraded Groovy dependency to version 2.3.7.
+* Support for Groovy Traits. Implement com.jayway.awaitility.groovy.AwaitilityTrait instead of using the com.jayway.awaitility.groovy.AwaitilitySupport mixin.
+
+Changelog 1.6.1 (2014-07-03)
+----------------------------
+* Added support for condition evaluation listeners. A listener is called each time a Hamcrest-based condition has been evaluated by Awaitility. For example:
+    with().
+            conditionEvaluationListener(condition -> System.out.printf("%s (elapsed time %dms, remaining time %dms)\n", condition.getDescription(), condition.getElapsedTimeInMS(), condition.getRemainingTimeInMS())).
+            await().atMost(Duration.TEN_SECONDS).until(new CountDown(5), is(equalTo(0)));
+  will print the following to the console:
+    com.jayway.awaitility.AwaitilityJava8Test$CountDown expected (<0> or a value less than <0>) but was <5> (elapsed time 101ms, remaining time 1899ms)
+    com.jayway.awaitility.AwaitilityJava8Test$CountDown expected (<0> or a value less than <0>) but was <4> (elapsed time 204ms, remaining time 1796ms)
+    com.jayway.awaitility.AwaitilityJava8Test$CountDown expected (<0> or a value less than <0>) but was <3> (elapsed time 306ms, remaining time 1694ms)
+    com.jayway.awaitility.AwaitilityJava8Test$CountDown expected (<0> or a value less than <0>) but was <2> (elapsed time 407ms, remaining time 1593ms)
+    com.jayway.awaitility.AwaitilityJava8Test$CountDown expected (<0> or a value less than <0>) but was <1> (elapsed time 508ms, remaining time 1492ms)
+    com.jayway.awaitility.AwaitilityJava8Test$CountDown reached its end value of (<0> or a value less than <0>) (elapsed time 610ms, remaining time 1390ms)
+  Big thanks to Maciej Gawinecki for the help.
+* Added primitive values to matching check when doing await().untilTrue(..) and await().untilFalse(..) (issue 26)
+* Fixed issue that caused poll interval to be used as poll delay (issue 29).
+
+Changelog 1.6.0 (2014-04-23)
+----------------------------
+* Support for using Fest Assert and AssertJ: await().until(() -> assertThat(fakeRepository.getValue()).isEqualTo(1));
+* Better Java 8 support
+* Updated Groovy module to use Groovy 2.2.2
+* Updated CgLib to version 3.1
+
+Changelog 1.5.0 (2014-01-27)
+----------------------------
+* Updated Objenesis dependency to version 2.1
+* Added support for returning the last polled value from Awaitility when using proxy conditions. For example: int y = await().untilCall(to(x).y(), greaterThan(2)); (issue 13).
+* Updated Groovy dependency to 2.2.1.
+* Non backward-compatible change: Awaitility now throws org.awaitility.core.ConditionTimeoutException instead of java.concurrent.TimeoutException. The reason is that ConditionTimeoutException is a runtime exception and the latter couldn't be caught since "await" didn't declare the checked exception. (issue 24)
+* Awaitility now catches all uncaught throwables from each thread and propagates them to the main thread (issue 22).
+* Improved error messages when using aliased await conditions (issue 21).
+
+Changelog 1.4.0 (2013-11-26)
+----------------------------
+* Updated Groovy to version 2.2.0
+* Fixed a bug that sometimes accidentally used poll interval as poll delay
+* Updated to Hamcrest 1.3
+* Updated Scala to version 2.10.3
+
+Changelog 1.3.5 (2013-02-16)
+----------------------------
+* Added untilFalse method to make it easier to wait until an atomic boolean is false: await().untilFalse(myAtomicBoolean);
+* Removed all checked exceptions from Awaitility so that you don't need to catch them (issue 19).
+* Improved error message when trying to proxy final methods (issue 10).
+
+Changelog 1.3.4 (2012-02-13)
+----------------------------
+* Updated Scala module to use Scala 2.9.1
+* Now uses the poll interval as delay _between_ scheduled tasks. This means that if the supplier takes more time to return the value than what's defined by the poll interval the supplier won't be called twice (or more) (issue 12).
+* Now supports usage of more flexible Hamcrest matchers (thanks to Xavier Dury for the patch) (issue 15).
+* Upgraded Hamcrest to version 1.2.1.
+
+Changelog 1.3.3
+---------------
+* Added support for AtomicInteger, AtomicLong, AtomicReference and AtomicBoolean, e.g. await().untilAtomic(atomic, equalTo(2)).
+
+Changelog 1.3.2
+---------------
+* Fixed an issue where poll interval overrode the poll delay.
+* Awaitility now throws IllegalStateException when timeout is less than or equal to the poll interval or poll delay.
+* Improved error messages when using field suppliers (e.g. await().until( fieldIn(object).ofType(int.class), is(2) );) when timeout occurs.
+
+Changelog 1.3.1
+---------------
+* Groovy support! Syntax is: await().until { something() > 5 }
+* Improved error messages in Scala DSL.
+* Add SPI support for extension DSL:s which allows them to provide error messages.
+
+Changelog 1.3
+-------------
+* MethodCallRecorder generates an exception on getLastXXX if no method call have been recorded. 
+* MethodCallRecorder is reset after retrieving last calls and on Awaitility.reset 
+* Added basic support for Scala functions
+* Added a fieldIn method to Awaitility which allows you to build a supplier using a field, e.g. await().until(fieldIn(object).ofType(int.class), equalTo(1));
+* Backward incompatible refactoring: until(callTo(..)) has been renamed to untilCall(to(..)). This to allow for extension DSL's (such as the Scala DSL) to work appropriately.
+* Fixed a bug that failed to set Awaitility to catch uncaught exceptions on reset
+
+Changelog version 1.2.1
+-----------------------
+* Changed ProxyCreator to use the standard InvocationHandler interface
+* Refactored for even better error messages.
+
+Changelog version 1.2
+---------------------
+* Improved error messages for timeouts to include actual value.
+
+Changelog version 1.1
+---------------------
+* Major internal refactoring to allow for better default error messages when a timeout occurs.
+* Support for using proxy-based conditions (i.e. using Awaitility.callTo) when testing Eclipse applications.
+* Calls to the method Object.finalize should not be recorded as this is part of gc.
